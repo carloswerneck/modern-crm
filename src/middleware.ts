@@ -14,7 +14,25 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  const secret = process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET;
+
+  // Try default cookie name first, then secure prefix
+  let token = await getToken({ req, secret });
+  if (!token) {
+    token = await getToken({
+      req,
+      secret,
+      cookieName: "__Secure-authjs.session-token",
+    });
+  }
+  if (!token) {
+    token = await getToken({
+      req,
+      secret,
+      cookieName: "authjs.session-token",
+    });
+  }
+
   const isLoggedIn = !!token;
   const isAuthPage = pathname.startsWith("/login");
 
