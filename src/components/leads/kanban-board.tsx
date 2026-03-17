@@ -16,6 +16,9 @@ import {
   User,
   Loader2,
   ChevronDown,
+  DollarSign,
+  Calendar,
+  UserCircle,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -31,8 +34,9 @@ interface LeadCard {
   stageId: string | null;
   person: { firstName: string; lastName: string | null } | null;
   organization: { name: string } | null;
-  owner: { name: string } | null;
+  owner: { name: string; image: string | null } | null;
   tags: Tag[];
+  createdAt?: string;
 }
 
 interface Stage {
@@ -164,6 +168,26 @@ function QuickAddForm({
 
 // ─── Lead Card Component ──────────────────────────────────────────────────────
 
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
+function timeAgo(dateStr?: string) {
+  if (!dateStr) return "";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const days = Math.floor(diff / 86400000);
+  if (days === 0) return "Hoje";
+  if (days === 1) return "Ontem";
+  if (days < 7) return `${days}d atrás`;
+  if (days < 30) return `${Math.floor(days / 7)}sem atrás`;
+  return `${Math.floor(days / 30)}m atrás`;
+}
+
 function LeadCardItem({
   lead,
   onDragStart,
@@ -183,54 +207,97 @@ function LeadCardItem({
           e.stopPropagation();
           onDragStart(e, lead.id);
         }}
-        className="p-3 border shadow-sm hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing bg-white group hover:border-primary/30"
+        className="p-0 border shadow-sm hover:shadow-lg transition-all duration-200 cursor-grab active:cursor-grabbing bg-white group hover:border-primary/40 overflow-hidden"
       >
-        <div className="flex items-start gap-2">
-          <GripVertical className="h-4 w-4 text-muted-foreground/40 mt-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-          <div className="flex-1 min-w-0 space-y-1.5">
-            <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
+        {/* Color accent bar */}
+        {lead.value && lead.value > 0 ? (
+          <div className="h-1 bg-gradient-to-r from-green-400 to-emerald-500" />
+        ) : (
+          <div className="h-1 bg-gradient-to-r from-slate-200 to-slate-300" />
+        )}
+
+        <div className="p-3.5 space-y-3">
+          {/* Title + drag handle */}
+          <div className="flex items-start gap-2">
+            <GripVertical className="h-4 w-4 text-muted-foreground/30 mt-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <p className="text-[13px] font-semibold leading-snug text-foreground group-hover:text-primary transition-colors line-clamp-2 flex-1">
               {lead.title}
             </p>
+          </div>
 
-            {personName && (
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <User className="h-3 w-3 shrink-0" />
-                <span className="truncate">{personName}</span>
+          {/* Value badge */}
+          {lead.value && lead.value > 0 && (
+            <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1 bg-green-50 text-green-700 rounded-md px-2 py-1">
+                <DollarSign className="h-3 w-3" />
+                <span className="text-xs font-bold">{formatCurrencyLocal(lead.value)}</span>
               </div>
-            )}
+            </div>
+          )}
 
-            {lead.organization && (
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Building2 className="h-3 w-3 shrink-0" />
-                <span className="truncate">{lead.organization.name}</span>
-              </div>
-            )}
+          {/* Contact info */}
+          {(personName || lead.organization) && (
+            <div className="space-y-1.5">
+              {personName && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="w-5 h-5 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center shrink-0">
+                    <User className="h-2.5 w-2.5" />
+                  </div>
+                  <span className="truncate font-medium">{personName}</span>
+                </div>
+              )}
 
-            <div className="flex items-center justify-between gap-2">
-              {lead.value ? (
-                <span className="text-xs font-semibold text-green-600">
-                  {formatCurrencyLocal(lead.value)}
-                </span>
-              ) : (
-                <span />
+              {lead.organization && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                    <Building2 className="h-2.5 w-2.5" />
+                  </div>
+                  <span className="truncate">{lead.organization.name}</span>
+                </div>
               )}
             </div>
+          )}
 
-            {lead.tags && lead.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {lead.tags.map((lt) => (
-                  <span
-                    key={lt.tag.id}
-                    className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium"
-                    style={{
-                      backgroundColor: lt.tag.color + "20",
-                      color: lt.tag.color,
-                    }}
-                  >
-                    {lt.tag.name}
-                  </span>
-                ))}
+          {/* Tags */}
+          {lead.tags && lead.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {lead.tags.map((lt) => (
+                <span
+                  key={lt.tag.id}
+                  className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold border"
+                  style={{
+                    backgroundColor: lt.tag.color + "15",
+                    color: lt.tag.color,
+                    borderColor: lt.tag.color + "30",
+                  }}
+                >
+                  {lt.tag.name}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Footer: owner + time */}
+          <div className="flex items-center justify-between pt-1 border-t border-dashed">
+            {lead.owner ? (
+              <div className="flex items-center gap-1.5">
+                <div className="w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[9px] font-bold">
+                  {getInitials(lead.owner.name)}
+                </div>
+                <span className="text-[11px] text-muted-foreground truncate max-w-[100px]">
+                  {lead.owner.name}
+                </span>
               </div>
+            ) : (
+              <div className="flex items-center gap-1 text-muted-foreground/50">
+                <UserCircle className="h-3.5 w-3.5" />
+                <span className="text-[10px]">Sem responsável</span>
+              </div>
+            )}
+            {lead.createdAt && (
+              <span className="text-[10px] text-muted-foreground/60">
+                {timeAgo(lead.createdAt)}
+              </span>
             )}
           </div>
         </div>
@@ -268,38 +335,44 @@ function KanbanColumn({
 
   return (
     <div
-      className={`flex flex-col min-w-[280px] max-w-[320px] w-[300px] shrink-0 rounded-xl transition-all duration-200 ${
-        isDragOver ? "ring-2 ring-primary/40 bg-primary/5" : "bg-muted/30"
+      className={`flex flex-col min-w-[300px] max-w-[340px] w-[320px] shrink-0 rounded-xl border transition-all duration-200 ${
+        isDragOver ? "ring-2 ring-primary/50 bg-primary/5 border-primary/30 scale-[1.01]" : "bg-muted/20 border-transparent"
       }`}
       onDragOver={(e) => onDragOver(e, stage.id)}
       onDragLeave={onDragLeave}
       onDrop={(e) => onDrop(e, stage.id)}
     >
       {/* Column Header */}
-      <div className="p-3 space-y-1">
+      <div className="p-4 space-y-2">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className={`w-2.5 h-2.5 rounded-full ${getProbabilityColor(stage.probability)}`} />
-            <h3 className="text-sm font-semibold truncate">{stage.name}</h3>
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5">
+          <div className="flex items-center gap-2.5">
+            <div className={`w-3 h-3 rounded-full ${getProbabilityColor(stage.probability)} ring-2 ring-offset-1 ${getProbabilityColor(stage.probability)}/30`} />
+            <h3 className="text-sm font-bold tracking-tight">{stage.name}</h3>
+            <Badge variant="secondary" className="text-[10px] px-2 py-0.5 h-5 rounded-full font-bold">
               {leads.length}
             </Badge>
           </div>
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6"
+            className="h-7 w-7 hover:bg-primary/10 hover:text-primary"
             onClick={() => setShowQuickAdd(true)}
           >
-            <Plus className="h-3.5 w-3.5" />
+            <Plus className="h-4 w-4" />
           </Button>
         </div>
-        {totalValue > 0 && (
-          <p className="text-xs text-muted-foreground font-medium pl-4.5">
-            {formatCurrencyLocal(totalValue)}
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground font-medium">
+            {totalValue > 0 ? formatCurrencyLocal(totalValue) : "R$ 0,00"}
           </p>
-        )}
-        <div className={`h-1 rounded-full ${getProbabilityColor(stage.probability)} opacity-60`} />
+          <p className="text-[10px] text-muted-foreground/60">{stage.probability}% prob.</p>
+        </div>
+        <div className="h-1.5 rounded-full bg-muted/50 overflow-hidden">
+          <div
+            className={`h-full rounded-full ${getProbabilityColor(stage.probability)} transition-all`}
+            style={{ width: `${stage.probability}%` }}
+          />
+        </div>
       </div>
 
       {/* Cards */}

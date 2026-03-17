@@ -112,8 +112,9 @@ export default async function LeadsPage({
             stageId: l.stageId,
             person: l.person,
             organization: l.organization,
-            owner: l.owner,
+            owner: l.owner ? { name: l.owner.name, image: l.owner.image ?? null } : null,
             tags: l.tags,
+            createdAt: l.createdAt.toISOString(),
           }))}
         />
       ) : (
