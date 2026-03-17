@@ -5,8 +5,8 @@ import { z } from "zod";
 
 const updateSchema = z.object({
   title: z.string().min(1).optional(),
-  description: z.string().optional(),
-  value: z.number().optional(),
+  description: z.string().optional().nullable(),
+  value: z.number().optional().nullable(),
   expectedCloseDate: z.string().optional().nullable(),
   pipelineId: z.string().optional().nullable(),
   stageId: z.string().optional().nullable(),
@@ -14,6 +14,7 @@ const updateSchema = z.object({
   organizationId: z.string().optional().nullable(),
   sourceId: z.string().optional().nullable(),
   typeId: z.string().optional().nullable(),
+  ownerId: z.string().optional().nullable(),
   lostReason: z.string().optional().nullable(),
 });
 
@@ -40,11 +41,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error }, { status: 400 });
 
+  const { expectedCloseDate, value, ...rest } = parsed.data;
+
   const lead = await prisma.lead.update({
     where: { id },
     data: {
-      ...parsed.data,
-      expectedCloseDate: parsed.data.expectedCloseDate ? new Date(parsed.data.expectedCloseDate) : parsed.data.expectedCloseDate === null ? null : undefined,
+      ...rest,
+      value: value !== undefined ? value : undefined,
+      expectedCloseDate: expectedCloseDate ? new Date(expectedCloseDate) : expectedCloseDate === null ? null : undefined,
     },
   });
 
