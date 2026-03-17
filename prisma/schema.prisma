@@ -1,0 +1,526 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth ───────────────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  status        Boolean   @default(true)
+  roleId        String?
+  role          Role?     @relation(fields: [roleId], references: [id])
+
+  // Relations
+  leads         Lead[]    @relation("LeadOwner")
+  persons       Person[]  @relation("PersonOwner")
+  organizations Organization[] @relation("OrgOwner")
+  activities    Activity[]
+  accounts      Account[]
+  sessions      Session[]
+  groups        UserGroup[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ─── Roles & Groups ──────────────────────────────────────────────────────────
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  permissions String[] @default([])
+  users       User[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("roles")
+}
+
+model Group {
+  id          String      @id @default(cuid())
+  name        String      @unique
+  description String?
+  users       UserGroup[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("groups")
+}
+
+model UserGroup {
+  userId  String
+  groupId String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([userId, groupId])
+  @@map("user_groups")
+}
+
+// ─── Tags ─────────────────────────────────────────────────────────────────────
+
+model Tag {
+  id    String @id @default(cuid())
+  name  String @unique
+  color String @default("#6366f1")
+
+  leads         LeadTag[]
+  persons       PersonTag[]
+  organizations OrganizationTag[]
+  products      ProductTag[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("tags")
+}
+
+// ─── Contacts ─────────────────────────────────────────────────────────────────
+
+model Person {
+  id             String       @id @default(cuid())
+  firstName      String
+  lastName       String?
+  email          String?
+  phone          String?
+  jobTitle       String?
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  ownerId        String?
+  owner          User?         @relation("PersonOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  leads      Lead[]
+  activities PersonActivity[]
+  tags       PersonTag[]
+  emails     Email[]
+  quotes     Quote[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("persons")
+}
+
+model PersonTag {
+  personId String
+  tagId    String
+  person   Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+  tag      Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([personId, tagId])
+  @@map("person_tags")
+}
+
+model Organization {
+  id      String  @id @default(cuid())
+  name    String
+  email   String?
+  phone   String?
+  website String?
+  address String?
+  city    String?
+  state   String?
+  country String?
+  ownerId String?
+  owner   User?   @relation("OrgOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  persons Person[]
+  leads   Lead[]
+  tags    OrganizationTag[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("organizations")
+}
+
+model OrganizationTag {
+  organizationId String
+  tagId          String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tag            Tag          @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([organizationId, tagId])
+  @@map("organization_tags")
+}
+
+// ─── Leads & Pipeline ─────────────────────────────────────────────────────────
+
+model Pipeline {
+  id          String  @id @default(cuid())
+  name        String
+  isDefault   Boolean @default(false)
+  rottenDays  Int     @default(30)
+
+  stages Stage[]
+  leads  Lead[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("pipelines")
+}
+
+model Stage {
+  id          String   @id @default(cuid())
+  name        String
+  code        String
+  probability Int      @default(0)
+  sortOrder   Int      @default(0)
+  pipelineId  String
+  pipeline    Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+
+  leads Lead[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("stages")
+}
+
+model LeadSource {
+  id    String @id @default(cuid())
+  name  String @unique
+  leads Lead[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("lead_sources")
+}
+
+model LeadType {
+  id    String @id @default(cuid())
+  name  String @unique
+  leads Lead[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("lead_types")
+}
+
+model Lead {
+  id               String      @id @default(cuid())
+  title            String
+  description      String?
+  value            Float?
+  expectedCloseDate DateTime?
+  lostReason       String?
+  pipelineId       String?
+  pipeline         Pipeline?   @relation(fields: [pipelineId], references: [id], onDelete: SetNull)
+  stageId          String?
+  stage            Stage?      @relation(fields: [stageId], references: [id], onDelete: SetNull)
+  personId         String?
+  person           Person?     @relation(fields: [personId], references: [id], onDelete: SetNull)
+  organizationId   String?
+  organization     Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  ownerId          String?
+  owner            User?       @relation("LeadOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  sourceId         String?
+  source           LeadSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  typeId           String?
+  type             LeadType?   @relation(fields: [typeId], references: [id], onDelete: SetNull)
+
+  activities LeadActivity[]
+  tags       LeadTag[]
+  quotes     QuoteLead[]
+  products   LeadProduct[]
+  emails     Email[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("leads")
+}
+
+model LeadTag {
+  leadId String
+  tagId  String
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([leadId, tagId])
+  @@map("lead_tags")
+}
+
+// ─── Activities ───────────────────────────────────────────────────────────────
+
+enum ActivityType {
+  CALL
+  MEETING
+  TASK
+  NOTE
+  EMAIL
+}
+
+model Activity {
+  id           String       @id @default(cuid())
+  title        String
+  type         ActivityType
+  comment      String?      @db.Text
+  location     String?
+  scheduledAt  DateTime?
+  endsAt       DateTime?
+  isDone       Boolean      @default(false)
+  ownerId      String?
+  owner        User?        @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  leads        LeadActivity[]
+  persons      PersonActivity[]
+  participants ActivityParticipant[]
+  files        ActivityFile[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("activities")
+}
+
+model LeadActivity {
+  leadId     String
+  activityId String
+  lead       Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@id([leadId, activityId])
+  @@map("lead_activities")
+}
+
+model PersonActivity {
+  personId   String
+  activityId String
+  person     Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@id([personId, activityId])
+  @@map("person_activities")
+}
+
+model ActivityParticipant {
+  id         String   @id @default(cuid())
+  activityId String
+  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  name       String
+  email      String?
+
+  @@map("activity_participants")
+}
+
+model ActivityFile {
+  id         String   @id @default(cuid())
+  activityId String
+  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  name       String
+  path       String
+  mimeType   String?
+  size       Int?
+
+  createdAt DateTime @default(now())
+
+  @@map("activity_files")
+}
+
+// ─── Products ─────────────────────────────────────────────────────────────────
+
+model Product {
+  id          String  @id @default(cuid())
+  name        String
+  sku         String? @unique
+  description String? @db.Text
+  price       Float   @default(0)
+  quantity    Int     @default(0)
+
+  leads      LeadProduct[]
+  quoteItems QuoteItem[]
+  tags       ProductTag[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("products")
+}
+
+model ProductTag {
+  productId String
+  tagId     String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([productId, tagId])
+  @@map("product_tags")
+}
+
+model LeadProduct {
+  leadId    String
+  productId String
+  quantity  Int    @default(1)
+  price     Float?
+  lead      Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([leadId, productId])
+  @@map("lead_products")
+}
+
+// ─── Quotes ───────────────────────────────────────────────────────────────────
+
+model Quote {
+  id              String    @id @default(cuid())
+  subject         String
+  description     String?   @db.Text
+  discount        Float     @default(0)
+  discountType    String    @default("fixed") // fixed | percent
+  tax             Float     @default(0)
+  adjustment      Float     @default(0)
+  grandTotal      Float     @default(0)
+  subTotal        Float     @default(0)
+  expiresAt       DateTime?
+  billingAddress  String?
+  shippingAddress String?
+  personId        String?
+  person          Person?   @relation(fields: [personId], references: [id], onDelete: SetNull)
+  ownerId         String?
+
+  items  QuoteItem[]
+  leads  QuoteLead[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("quotes")
+}
+
+model QuoteItem {
+  id        String  @id @default(cuid())
+  quoteId   String
+  quote     Quote   @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  name      String
+  quantity  Int     @default(1)
+  price     Float   @default(0)
+  discount  Float   @default(0)
+  tax       Float   @default(0)
+  total     Float   @default(0)
+
+  @@map("quote_items")
+}
+
+model QuoteLead {
+  quoteId String
+  leadId  String
+  quote   Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  lead    Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@id([quoteId, leadId])
+  @@map("quote_leads")
+}
+
+// ─── Emails ───────────────────────────────────────────────────────────────────
+
+model Email {
+  id        String   @id @default(cuid())
+  subject   String
+  body      String   @db.Text
+  from      String
+  to        String[]
+  cc        String[]
+  isRead    Boolean  @default(false)
+  folder    String   @default("inbox")
+  parentId  String?
+  parent    Email?   @relation("EmailThread", fields: [parentId], references: [id], onDelete: SetNull)
+  replies   Email[]  @relation("EmailThread")
+  personId  String?
+  person    Person?  @relation(fields: [personId], references: [id], onDelete: SetNull)
+  leadId    String?
+  lead      Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  attachments EmailAttachment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("emails")
+}
+
+model EmailAttachment {
+  id       String @id @default(cuid())
+  emailId  String
+  email    Email  @relation(fields: [emailId], references: [id], onDelete: Cascade)
+  name     String
+  path     String
+  mimeType String?
+  size     Int?
+
+  @@map("email_attachments")
+}
+
+// ─── Automation ───────────────────────────────────────────────────────────────
+
+model Webhook {
+  id     String @id @default(cuid())
+  name   String
+  url    String
+  event  String
+  method String @default("POST")
+  active Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("webhooks")
+}
