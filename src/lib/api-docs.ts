@@ -9,6 +9,10 @@ export interface Param {
   type: string;
   required?: boolean;
   description?: string;
+  /** Valor fixo: o campo é mostrado, mas não editável. */
+  fixed?: boolean;
+  /** Campo que só agrupa outros (ex.: "data"): não tem input próprio. */
+  noInput?: boolean;
 }
 
 export interface ApiResponse {
@@ -227,8 +231,8 @@ function hook(
     auth: "apikey",
     description,
     bodyParams: [
-      { name: "action", type: "string", required: true, description: `Fixo: "${action}"` },
-      { name: "data", type: "object", required: true, description: "Campos da ação (veja abaixo)" },
+      { name: "action", type: "string", required: true, description: `Fixo: "${action}"`, fixed: true },
+      { name: "data", type: "object", required: true, description: "Campos da ação (veja abaixo)", noInput: true },
       ...fields.map((f) => ({ ...f, name: `data.${f.name}` })),
     ],
     bodyExample: { action, data: example },

@@ -178,25 +178,107 @@ function toCode(lang: Lang, r: BuiltRequest, ep: Endpoint): string {
 
 // ─── Blocos da coluna central ────────────────────────────────────────────────
 
-function ParamList({ title, params }: { title: string; params?: Param[] }) {
+const FIELD_CLASS =
+  "w-full rounded-md border border-white/10 bg-[#11141b] px-3 py-2 font-mono text-sm text-white placeholder:text-slate-600 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60";
+
+function ParamList({
+  title,
+  params,
+  getValue,
+  onChange,
+}: {
+  title: string;
+  params?: Param[];
+  getValue: (p: Param) => string;
+  onChange: (p: Param, value: string) => void;
+}) {
   if (!params?.length) return null;
   return (
     <section className="mt-10">
       <h3 className="mb-3 text-lg font-semibold text-white">{title}</h3>
       <div className="divide-y divide-white/10 rounded-lg border border-white/10 bg-white/[0.02]">
         {params.map((p) => (
-          <div key={p.name} className="px-4 py-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-sm font-semibold text-white">{p.name}</span>
-              <span className="text-xs text-slate-400">{p.type}</span>
-              {p.required && <span className="text-xs font-medium text-red-400">required</span>}
+          <div key={p.name} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-sm font-semibold text-white">{p.name}</span>
+                <span className="text-xs text-slate-400">{p.type}</span>
+                {p.required && <span className="text-xs font-medium text-red-400">required</span>}
+              </div>
+              {p.description && <p className="mt-1 text-sm text-slate-400">{p.description}</p>}
             </div>
-            {p.description && <p className="mt-1 text-sm text-slate-400">{p.description}</p>}
+            {!p.noInput && (
+              <div className="w-full shrink-0 sm:w-56">
+                {p.type === "boolean" ? (
+                  <select
+                    value={getValue(p)}
+                    onChange={(e) => onChange(p, e.target.value)}
+                    className={FIELD_CLASS}
+                  >
+                    <option value="">—</option>
+                    <option value="true">true</option>
+                    <option value="false">false</option>
+                  </select>
+                ) : (
+                  <input
+                    value={getValue(p)}
+                    onChange={(e) => onChange(p, e.target.value)}
+                    disabled={p.fixed}
+                    placeholder={p.name.split(".").pop()}
+                    spellCheck={false}
+                    autoComplete="off"
+                    aria-label={`Valor de ${p.name}`}
+                    className={FIELD_CLASS}
+                  />
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>
     </section>
   );
+}
+
+// Leitura/escrita de campos (com notação "a.b") no JSON do body.
+function getBodyField(obj: unknown, name: string): string {
+  let cur: unknown = obj;
+  for (const key of name.split(".")) {
+    if (cur === null || typeof cur !== "object") return "";
+    cur = (cur as Record<string, unknown>)[key];
+  }
+  if (cur === undefined || cur === null) return "";
+  return typeof cur === "string" ? cur : JSON.stringify(cur);
+}
+
+function coerceValue(type: string, raw: string): unknown {
+  if (raw === "") return undefined;
+  if (type === "number") return /^-?\d+(\.\d+)?$/.test(raw) ? Number(raw) : raw;
+  if (type === "boolean") return raw === "true";
+  if (type.includes("[]") || type === "object") {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return raw;
+    }
+  }
+  return raw;
+}
+
+function setBodyField(obj: Record<string, unknown>, p: Param, raw: string): Record<string, unknown> {
+  const next = structuredClone(obj);
+  const keys = p.name.split(".");
+  let cur = next;
+  for (const key of keys.slice(0, -1)) {
+    const child = cur[key];
+    if (child === null || typeof child !== "object" || Array.isArray(child)) cur[key] = {};
+    cur = cur[key] as Record<string, unknown>;
+  }
+  const last = keys[keys.length - 1];
+  const value = coerceValue(p.type, raw);
+  if (value === undefined) delete cur[last];
+  else cur[last] = value;
+  return next;
 }
 
 function AuthNote({ ep }: { ep: Endpoint }) {
@@ -288,6 +370,16 @@ export default function DocsClient() {
       }))
       .filter((g) => g.entries.length > 0);
   }, [query]);
+
+  // JSON do body como objeto, para preencher os campos de Body Params
+  const bodyObj = useMemo<Record<string, unknown>>(() => {
+    try {
+      const v = JSON.parse(bodyText);
+      return v && typeof v === "object" && !Array.isArray(v) ? v : {};
+    } catch {
+      return {};
+    }
+  }, [bodyText]);
 
   const request = useMemo(
     () =>
@@ -450,9 +542,24 @@ export default function DocsClient() {
                 <p className="mt-5 text-lg leading-relaxed text-slate-300">{entry.description}</p>
                 <AuthNote ep={entry} />
 
-                <ParamList title="Path Params" params={entry.pathParams} />
-                <ParamList title="Query Params" params={entry.queryParams} />
-                <ParamList title="Body Params" params={entry.bodyParams} />
+                <ParamList
+                  title="Path Params"
+                  params={entry.pathParams}
+                  getValue={(p) => pathValues[p.name] ?? ""}
+                  onChange={(p, v) => setPathValues((s) => ({ ...s, [p.name]: v }))}
+                />
+                <ParamList
+                  title="Query Params"
+                  params={entry.queryParams}
+                  getValue={(p) => queryValues[p.name] ?? ""}
+                  onChange={(p, v) => setQueryValues((s) => ({ ...s, [p.name]: v }))}
+                />
+                <ParamList
+                  title="Body Params"
+                  params={entry.bodyParams}
+                  getValue={(p) => getBodyField(bodyObj, p.name)}
+                  onChange={(p, v) => setBodyText(JSON.stringify(setBodyField(bodyObj, p, v), null, 2))}
+                />
 
                 <section className="mt-10">
                   <h3 className="mb-3 text-lg font-semibold text-white">Responses</h3>
@@ -505,35 +612,7 @@ export default function DocsClient() {
                   </div>
                 )}
 
-                {/* Parâmetros do Try It */}
-                {!!(entry.pathParams?.length || entry.queryParams?.length) && (
-                  <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.03] p-4">
-                    {entry.pathParams?.map((p) => (
-                      <label key={p.name} className="block text-xs text-slate-400">
-                        {p.name} <span className="text-red-400">*</span>
-                        <input
-                          value={pathValues[p.name] ?? ""}
-                          onChange={(e) => setPathValues((v) => ({ ...v, [p.name]: e.target.value }))}
-                          placeholder={p.name}
-                          className="mt-1 w-full rounded-md border border-white/10 bg-[#11141b] px-3 py-2 font-mono text-sm text-white focus:border-blue-500 focus:outline-none"
-                        />
-                      </label>
-                    ))}
-                    {entry.queryParams?.map((p) => (
-                      <label key={p.name} className="block text-xs text-slate-400">
-                        {p.name}
-                        <input
-                          value={queryValues[p.name] ?? ""}
-                          onChange={(e) => setQueryValues((v) => ({ ...v, [p.name]: e.target.value }))}
-                          placeholder={p.name}
-                          className="mt-1 w-full rounded-md border border-white/10 bg-[#11141b] px-3 py-2 font-mono text-sm text-white focus:border-blue-500 focus:outline-none"
-                        />
-                      </label>
-                    ))}
-                  </div>
-                )}
-
-                {/* Body editável */}
+                {/* Body editável (sincronizado com os campos de Body Params) */}
                 {entry.bodyExample !== undefined && (
                   <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
                     <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
