@@ -7,6 +7,7 @@ export async function middleware(req: NextRequest) {
   // Allow public paths
   if (
     pathname.startsWith("/api") ||
+    pathname.startsWith("/docs") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
     pathname.startsWith("/public")
