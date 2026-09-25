@@ -77,7 +77,7 @@ export default function LoginPage() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="admin@crm.com"
+                  placeholder="seu@email.com"
                   {...register("email")}
                   className={errors.email ? "border-destructive" : ""}
                 />
@@ -115,12 +115,6 @@ export default function LoginPage() {
                 )}
               </Button>
             </form>
-
-            <div className="mt-4 p-3 bg-muted rounded-lg text-xs text-muted-foreground">
-              <p className="font-medium mb-1">Credenciais padrão:</p>
-              <p>E-mail: admin@crm.com</p>
-              <p>Senha: admin123</p>
-            </div>
           </CardContent>
         </Card>
       </div>
