@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ArrowLeft, Edit, Target, User, Building2, Mail, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
+import DeleteLeadButton from "@/components/leads/delete-lead-button";
 
 async function getLead(id: string) {
   return prisma.lead.findUnique({
@@ -46,9 +47,12 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             <p className="text-sm text-muted-foreground">Criado {formatDateRelative(lead.createdAt)}</p>
           </div>
         </div>
-        <Link href={`/leads/${id}/edit`}>
-          <Button variant="outline" size="sm"><Edit className="mr-2 h-4 w-4" />Editar</Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href={`/leads/${id}/edit`}>
+            <Button variant="outline" size="sm"><Edit className="mr-2 h-4 w-4" />Editar</Button>
+          </Link>
+          <DeleteLeadButton leadId={lead.id} leadTitle={lead.title} redirectTo="/leads" />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

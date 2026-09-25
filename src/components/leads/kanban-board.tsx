@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import DeleteLeadButton from "@/components/leads/delete-lead-button";
 import {
   Plus,
   X,
@@ -191,9 +192,11 @@ function timeAgo(dateStr?: string) {
 function LeadCardItem({
   lead,
   onDragStart,
+  onDeleted,
 }: {
   lead: LeadCard;
   onDragStart: (e: React.DragEvent, leadId: string) => void;
+  onDeleted: (leadId: string) => void;
 }) {
   const personName = lead.person
     ? `${lead.person.firstName} ${lead.person.lastName || ""}`.trim()
@@ -223,6 +226,13 @@ function LeadCardItem({
             <p className="text-[13px] font-semibold leading-snug text-foreground group-hover:text-primary transition-colors line-clamp-2 flex-1">
               {lead.title}
             </p>
+            <DeleteLeadButton
+              leadId={lead.id}
+              leadTitle={lead.title}
+              variant="icon"
+              onDeleted={onDeleted}
+              className="-mr-1.5 -mt-1.5 h-6 w-6 shrink-0 text-muted-foreground/40 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 focus:opacity-100"
+            />
           </div>
 
           {/* Value badge */}
@@ -318,6 +328,7 @@ function KanbanColumn({
   onDragLeave,
   onDrop,
   onLeadCreated,
+  onLeadDeleted,
 }: {
   stage: Stage;
   leads: LeadCard[];
@@ -328,6 +339,7 @@ function KanbanColumn({
   onDragLeave: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent, stageId: string) => void;
   onLeadCreated: (lead: LeadCard) => void;
+  onLeadDeleted: (leadId: string) => void;
 }) {
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const totalValue = leads.reduce((sum, l) => sum + (l.value || 0), 0);
@@ -387,7 +399,7 @@ function KanbanColumn({
         )}
 
         {leads.map((lead) => (
-          <LeadCardItem key={lead.id} lead={lead} onDragStart={onDragStart} />
+          <LeadCardItem key={lead.id} lead={lead} onDragStart={onDragStart} onDeleted={onLeadDeleted} />
         ))}
 
         {leads.length === 0 && !showQuickAdd && (
@@ -574,6 +586,10 @@ export default function KanbanBoard({
     setLeads((prev) => [lead, ...prev]);
   }, []);
 
+  const handleLeadDeleted = useCallback((leadId: string) => {
+    setLeads((prev) => prev.filter((l) => l.id !== leadId));
+  }, []);
+
   const handlePipelineChange = useCallback((pipelineId: string) => {
     setSelectedPipelineId(pipelineId);
   }, []);
@@ -626,6 +642,7 @@ export default function KanbanBoard({
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
             onLeadCreated={handleLeadCreated}
+            onLeadDeleted={handleLeadDeleted}
           />
         ))}
       </div>

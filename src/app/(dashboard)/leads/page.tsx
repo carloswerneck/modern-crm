@@ -8,6 +8,7 @@ import { Plus, Target, DollarSign, TrendingUp, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import KanbanBoard from "@/components/leads/kanban-board";
 import LeadsViewToggle from "@/components/leads/leads-view-toggle";
+import DeleteLeadButton from "@/components/leads/delete-lead-button";
 
 async function getLeads(search?: string) {
   return prisma.lead.findMany({
@@ -138,12 +139,13 @@ export default async function LeadsPage({
                       <th className="text-left p-4 text-sm font-medium text-muted-foreground">Valor</th>
                       <th className="text-left p-4 text-sm font-medium text-muted-foreground">Responsável</th>
                       <th className="text-left p-4 text-sm font-medium text-muted-foreground">Criado em</th>
+                      <th className="p-4 w-12" aria-label="Ações" />
                     </tr>
                   </thead>
                   <tbody className="divide-y">
                     {leads.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="text-center py-12 text-muted-foreground">
+                        <td colSpan={7}className="text-center py-12 text-muted-foreground">
                           <Target className="h-12 w-12 mx-auto mb-3 opacity-20" />
                           <p>Nenhum lead encontrado</p>
                           <Link href="/leads/new">
@@ -175,6 +177,9 @@ export default async function LeadsPage({
                           </td>
                           <td className="p-4 text-sm text-muted-foreground">{lead.owner?.name || "-"}</td>
                           <td className="p-4 text-sm text-muted-foreground">{formatDate(lead.createdAt)}</td>
+                          <td className="p-4 text-right">
+                            <DeleteLeadButton leadId={lead.id} leadTitle={lead.title} variant="icon" />
+                          </td>
                         </tr>
                       ))
                     )}
